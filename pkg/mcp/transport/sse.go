@@ -3,10 +3,13 @@ package transport
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"sync"
+
+	"github.com/goschan/enterprise-mcp-gateway/pkg/mcp/protocol"
 )
 
 // Session represents an active SSE client connection.
@@ -118,6 +121,9 @@ func (t *SSETransport) HandleMessage(w http.ResponseWriter, r *http.Request) {
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
+		errResp := protocol.NewErrorResponse(nil, protocol.CodeParseError, "Failed to read request body", err.Error())
+		errBytes, _ := json.Marshal(errResp)
+		t.sendToSession(session, errBytes)
 		http.Error(w, "Failed to read request body", http.StatusBadRequest)
 		return
 	}
@@ -125,15 +131,16 @@ func (t *SSETransport) HandleMessage(w http.ResponseWriter, r *http.Request) {
 
 	resp, err := t.server.HandleMessage(r.Context(), body)
 	if err != nil {
+		errResp := protocol.NewErrorResponse(nil, protocol.CodeInternalError, "Internal error processing message", err.Error())
+		errBytes, _ := json.Marshal(errResp)
+		t.sendToSession(session, errBytes)
 		http.Error(w, fmt.Sprintf("Handler error: %v", err), http.StatusInternalServerError)
 		return
 	}
 
 	// If there is a response, send it through the SSE event channel
 	if len(resp) > 0 {
-		select {
-		case session.Events <- resp:
-		case <-session.Done:
+		if !t.sendToSession(session, resp) {
 			http.Error(w, "Session closed", http.StatusGone)
 			return
 		}
@@ -141,6 +148,15 @@ func (t *SSETransport) HandleMessage(w http.ResponseWriter, r *http.Request) {
 
 	w.WriteHeader(http.StatusAccepted)
 	_, _ = w.Write([]byte("Accepted"))
+}
+
+func (t *SSETransport) sendToSession(session *Session, data []byte) bool {
+	select {
+	case session.Events <- data:
+		return true
+	case <-session.Done:
+		return false
+	}
 }
 
 func generateSessionID() string {

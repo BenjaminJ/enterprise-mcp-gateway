@@ -124,8 +124,22 @@ func (l *Logger) HashInput(input any) string {
 	return hex.EncodeToString(hash[:])
 }
 
-// Close closes any underlying file writer if open.
+// Flush flushes buffered data to the underlying writer if supported.
+func (l *Logger) Flush() error {
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	if syncer, ok := l.writer.(interface{ Sync() error }); ok {
+		return syncer.Sync()
+	}
+	if flusher, ok := l.writer.(interface{ Flush() error }); ok {
+		return flusher.Flush()
+	}
+	return nil
+}
+
+// Close closes any underlying file writer if open after flushing.
 func (l *Logger) Close() error {
+	_ = l.Flush()
 	l.mu.Lock()
 	defer l.mu.Unlock()
 	if l.closer != nil && l.closer != os.Stdout && l.closer != os.Stderr {
