@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: Enterprise CRM & Billing API
-  description: Enterprise REST microservice managing customer accounts, billing details, and support tickets.
+  description: Enterprise REST microservice managing customer accounts, billing details, and support tickets with field-level DLP sanitization.
   version: 1.0.0
 servers:
   - url: http://localhost:8081
@@ -11,30 +11,39 @@ paths:
   /v1/customers:
     get:
       operationId: listCustomers
-      summary: List customer accounts
-      description: Retrieve a paginated list of enterprise customer profiles.
+      summary: List enterprise customer profiles
+      description: |
+        Retrieves a paginated list of enterprise customer accounts. Use this tool when you need to search, discover, or browse customer records. Returns an array of customer objects containing customerId, name, email, and account status.
       parameters:
         - name: status
           in: query
-          description: Filter customers by active/inactive status
+          description: Filter customers by account lifecycle status (e.g., 'active', 'inactive', or 'suspended'). Leave empty to retrieve all statuses.
           required: false
           schema:
             type: string
+            enum: [active, inactive, suspended]
+            example: active
         - name: limit
           in: query
-          description: Max records to return
+          description: Maximum number of customer records to return in a single page (between 1 and 100). Defaults to 20.
           required: false
           schema:
             type: integer
+            minimum: 1
+            maximum: 100
+            default: 20
+            example: 10
       responses:
         '200':
-          description: List of customers
+          description: Successfully retrieved list of customer profiles.
     post:
       operationId: createCustomer
-      summary: Register a new customer
-      description: Create a customer profile with name, email, and billing card.
+      summary: Register a new enterprise customer
+      description: |
+        Creates a new enterprise customer profile with contact information and primary payment details. Use this tool when onboarding a new account. Sensitive fields like payment card numbers are automatically redacted by the gateway before responses return.
       requestBody:
         required: true
+        description: Customer registration payload including contact and billing details.
         content:
           application/json:
             schema:
@@ -45,74 +54,94 @@ paths:
               properties:
                 name:
                   type: string
-                  description: Full customer name
+                  description: Full legal name or corporate entity name of the customer (e.g., 'Alice Smith').
+                  example: "Alice Smith"
                 email:
                   type: string
-                  description: Email address
+                  format: email
+                  description: Primary corporate email address for account billing and notifications.
+                  example: "alice@enterprise.com"
                 creditCard:
                   type: string
-                  description: Primary payment card number
+                  description: Primary payment credit card number (16 digits). This field is sanitized in-flight via DLP.
+                  example: "4111-2222-3333-4444"
       responses:
         '201':
-          description: Customer created successfully
+          description: Customer profile created successfully.
 
   /v1/customers/{customerId}:
     get:
       operationId: getCustomerDetails
-      summary: Get customer details
-      description: Retrieve full customer record including address, tax ID, and email.
+      summary: Retrieve detailed customer record by ID
+      description: |
+        Retrieves the complete customer account record including full name, corporate email, tax identifier, registered address, and active service tier. Use this tool after discovering a customerId to inspect account metadata.
       parameters:
         - name: customerId
           in: path
           required: true
-          description: Unique customer identifier
+          description: Unique customer identifier in format 'cust-XXX' (e.g., 'cust-001', 'cust-002').
           schema:
             type: string
+            example: "cust-001"
       responses:
         '200':
-          description: Detailed customer record
+          description: Detailed customer profile record.
+        '404':
+          description: Customer with specified identifier was not found.
 
   /v1/billing/{customerId}:
     get:
       operationId: getBillingHistory
-      summary: Get billing history and payment methods
-      description: Returns invoices, payment methods, and transactions for a customer.
+      summary: Retrieve customer billing statements and payment methods
+      description: |
+        Retrieves complete billing statements, current balance due, active payment methods on file, and historical invoice IDs for a specific customer. Payment cards in the response are automatically redacted with [REDACTED] by the DLP engine.
       parameters:
         - name: customerId
           in: path
           required: true
-          description: Unique customer identifier
+          description: Unique customer identifier in format 'cust-XXX' (e.g., 'cust-001').
           schema:
             type: string
+            example: "cust-001"
       responses:
         '200':
-          description: Customer billing statements and card details
+          description: Billing summary, balance, payment methods, and invoice records.
+        '404':
+          description: Billing records not found for specified customer.
 
   /v1/support/tickets:
     get:
       operationId: listSupportTickets
-      summary: List support tickets
-      description: Query support tickets for a given customer or priority.
+      summary: Query customer support tickets
+      description: |
+        Queries open and resolved support tickets across the organization. Can be filtered by customerId or ticket urgency priority. Use this tool to check active issues, SLA status, or service incidents.
       parameters:
         - name: customerId
           in: query
           required: false
+          description: Optional filter to retrieve support tickets for a specific customer ID (e.g., 'cust-001').
           schema:
             type: string
+            example: "cust-001"
         - name: priority
           in: query
           required: false
+          description: Filter tickets by urgency level ('low', 'normal', 'high', 'urgent').
           schema:
             type: string
+            enum: [low, normal, high, urgent]
+            example: "high"
       responses:
         '200':
-          description: List of support tickets
+          description: List of support tickets matching search criteria.
     post:
       operationId: createSupportTicket
-      summary: Open a new support ticket
-      description: Submit an incident or question on behalf of a customer.
+      summary: Open a new customer support ticket
+      description: |
+        Creates a new support incident or customer inquiry ticket in the CRM. Assigns a unique ticket ID and routes it to the support queue based on specified priority.
       requestBody:
         required: true
+        description: Support ticket details including customer identifier, subject line, and description.
         content:
           application/json:
             schema:
@@ -124,23 +153,35 @@ paths:
               properties:
                 customerId:
                   type: string
+                  description: The customer ID associated with this support request (e.g., 'cust-001').
+                  example: "cust-001"
                 subject:
                   type: string
+                  description: Brief summary or title of the support issue (e.g., 'Database latency issue').
+                  example: "Database latency issue on invoice generation"
                 description:
                   type: string
+                  description: Detailed explanation of the customer issue, reproduction steps, or question.
+                  example: "Customer reported timeouts when generating PDF invoices for Q3."
                 priority:
                   type: string
+                  enum: [low, normal, high, urgent]
+                  default: normal
+                  description: Urgency priority level for the ticket routing.
+                  example: "high"
       responses:
         '201':
-          description: Ticket opened successfully
+          description: Support ticket created successfully.
 
   /v1/admin/reset-password:
     post:
       operationId: adminResetPassword
-      summary: Reset customer portal credentials (Admin only)
-      description: Administrative tool to force a password reset for an enterprise user.
+      summary: Force reset portal credentials (Admin only)
+      description: |
+        Administrative tool to trigger a password reset and generate temporary credentials for an enterprise customer portal user. Requires 'admin' RBAC role privileges.
       requestBody:
         required: true
+        description: User account to reset.
         content:
           application/json:
             schema:
@@ -150,8 +191,12 @@ paths:
               properties:
                 username:
                   type: string
+                  description: Corporate username or email of the account to reset.
+                  example: "alice@enterprise.com"
                 tempPassword:
                   type: string
+                  description: Optional temporary password. If omitted, a secure random one is generated.
+                  example: "TempSecret2026!"
       responses:
         '200':
-          description: Password reset completed
+          description: Password reset completed successfully.

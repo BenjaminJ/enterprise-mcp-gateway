@@ -1,0 +1,10 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "io.github.BenjaminJ/enterprise-mcp-gateway",
+  "description": "Production-grade MCP Gateway in Go with RBAC, in-flight PII redaction, and audit logging.",
+  "version": "1.0.0",
+  "repository": {
+    "source": "github",
+    "url": "https://github.com/BenjaminJ/enterprise-mcp-gateway"
+  }
+}

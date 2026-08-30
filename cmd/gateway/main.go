@@ -14,6 +14,7 @@ import (
 
 	"github.com/goschan/enterprise-mcp-gateway/pkg/audit"
 	"github.com/goschan/enterprise-mcp-gateway/pkg/config"
+	"github.com/goschan/enterprise-mcp-gateway/pkg/connector/mock"
 	"github.com/goschan/enterprise-mcp-gateway/pkg/connector/openapi"
 	"github.com/goschan/enterprise-mcp-gateway/pkg/governance/rbac"
 	"github.com/goschan/enterprise-mcp-gateway/pkg/mcp/protocol"
@@ -70,6 +71,9 @@ func main() {
 	toolToInvoker := make(map[string]*openapi.Invoker)
 
 	for _, conn := range cfg.Connectors {
+		if strings.Contains(conn.BaseURL, ":8081") {
+			mock.StartAutoMockServer(8081)
+		}
 		if conn.Type == "openapi" && conn.SpecFile != "" {
 			tools, endpoints, err := openapi.ParseSpecFile(conn.SpecFile)
 			if err != nil {

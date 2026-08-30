@@ -137,10 +137,19 @@ func parseOperation(path string, method string, op map[string]interface{}) (Endp
 				}
 			}
 
-			properties[pName] = map[string]interface{}{
+			propMap := map[string]interface{}{
 				"type":        pType,
 				"description": pDesc,
 			}
+			if pSchema != nil {
+				for _, key := range []string{"enum", "default", "example", "format", "minimum", "maximum"} {
+					if val, exists := pSchema[key]; exists {
+						propMap[key] = val
+					}
+				}
+			}
+
+			properties[pName] = propMap
 
 			if pRequired {
 				required = append(required, pName)

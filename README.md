@@ -3,6 +3,7 @@
 <p align="center">
   <img src="https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go" alt="Go Version" />
   <img src="https://img.shields.io/badge/Protocol-MCP%202024--11--05-blueviolet?style=flat" alt="MCP Version" />
+  <a href="https://glama.ai/mcp/servers/BenjaminJ/enterprise-mcp-gateway"><img src="https://glama.ai/mcp/servers/BenjaminJ/enterprise-mcp-gateway/badges/score.svg" alt="Glama Score" /></a>
   <img src="https://img.shields.io/badge/Security-RBAC%20%2B%20DLP-green?style=flat" alt="Security" />
   <img src="https://img.shields.io/badge/License-MIT-yellow?style=flat" alt="License" />
 </p>
