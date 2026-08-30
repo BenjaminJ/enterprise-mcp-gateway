@@ -14,6 +14,12 @@
 </p>
 
 <p align="center">
+  <a href="https://glama.ai/mcp/servers/BenjaminJ/enterprise-mcp-gateway">
+    <img src="https://glama.ai/mcp/servers/BenjaminJ/enterprise-mcp-gateway/badges/card.svg" alt="enterprise-mcp-gateway Glama Card" />
+  </a>
+</p>
+
+<p align="center">
   <img src="docs/assets/demo.gif" alt="Enterprise MCP Gateway Live Demo" width="100%" />
   <br>
   <em><b>Live Demo:</b> AI Agent querying CRM with in-flight PII & card redaction (left) while the Gateway streams structured JSON audit logs in real-time (right).</em>
