@@ -1,0 +1,157 @@
+openapi: 3.0.0
+info:
+  title: Enterprise CRM & Billing API
+  description: Enterprise REST microservice managing customer accounts, billing details, and support tickets.
+  version: 1.0.0
+servers:
+  - url: http://localhost:8081
+    description: Mock CRM Service
+
+paths:
+  /v1/customers:
+    get:
+      operationId: listCustomers
+      summary: List customer accounts
+      description: Retrieve a paginated list of enterprise customer profiles.
+      parameters:
+        - name: status
+          in: query
+          description: Filter customers by active/inactive status
+          required: false
+          schema:
+            type: string
+        - name: limit
+          in: query
+          description: Max records to return
+          required: false
+          schema:
+            type: integer
+      responses:
+        '200':
+          description: List of customers
+    post:
+      operationId: createCustomer
+      summary: Register a new customer
+      description: Create a customer profile with name, email, and billing card.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - name
+                - email
+              properties:
+                name:
+                  type: string
+                  description: Full customer name
+                email:
+                  type: string
+                  description: Email address
+                creditCard:
+                  type: string
+                  description: Primary payment card number
+      responses:
+        '201':
+          description: Customer created successfully
+
+  /v1/customers/{customerId}:
+    get:
+      operationId: getCustomerDetails
+      summary: Get customer details
+      description: Retrieve full customer record including address, tax ID, and email.
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          description: Unique customer identifier
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Detailed customer record
+
+  /v1/billing/{customerId}:
+    get:
+      operationId: getBillingHistory
+      summary: Get billing history and payment methods
+      description: Returns invoices, payment methods, and transactions for a customer.
+      parameters:
+        - name: customerId
+          in: path
+          required: true
+          description: Unique customer identifier
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Customer billing statements and card details
+
+  /v1/support/tickets:
+    get:
+      operationId: listSupportTickets
+      summary: List support tickets
+      description: Query support tickets for a given customer or priority.
+      parameters:
+        - name: customerId
+          in: query
+          required: false
+          schema:
+            type: string
+        - name: priority
+          in: query
+          required: false
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of support tickets
+    post:
+      operationId: createSupportTicket
+      summary: Open a new support ticket
+      description: Submit an incident or question on behalf of a customer.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - customerId
+                - subject
+                - description
+              properties:
+                customerId:
+                  type: string
+                subject:
+                  type: string
+                description:
+                  type: string
+                priority:
+                  type: string
+      responses:
+        '201':
+          description: Ticket opened successfully
+
+  /v1/admin/reset-password:
+    post:
+      operationId: adminResetPassword
+      summary: Reset customer portal credentials (Admin only)
+      description: Administrative tool to force a password reset for an enterprise user.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required:
+                - username
+              properties:
+                username:
+                  type: string
+                tempPassword:
+                  type: string
+      responses:
+        '200':
+          description: Password reset completed

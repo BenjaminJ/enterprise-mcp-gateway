@@ -1,0 +1,63 @@
+server:
+  name: "enterprise-mcp-gateway"
+  version: "1.0.0"
+  transport: "stdio" # Change to "sse" to run as an HTTP SSE daemon
+  host: "0.0.0.0"
+  port: 8080
+
+governance:
+  enabled: true
+  default_role: "support_agent"
+  tokens:
+    "agent-readonly-key": "readonly_agent"
+    "agent-support-key": "support_agent"
+    "admin-super-key": "admin"
+  roles:
+    readonly_agent:
+      allowed_tools:
+        - "list*"
+        - "get*"
+    support_agent:
+      allowed_tools:
+        - "list*"
+        - "get*"
+        - "createSupportTicket"
+    admin:
+      allowed_tools:
+        - "*"
+
+sanitizer:
+  enabled: true
+  mask_card_numbers: true
+  mask_ssn: true
+  mask_emails: false
+  mask_phone_numbers: false
+  mask_secrets: true
+  sensitive_keys:
+    - "password"
+    - "passwd"
+    - "secret"
+    - "token"
+    - "apiKey"
+    - "ssn"
+    - "creditCard"
+    - "card_number"
+  custom_regex:
+    - name: "Internal Employee ID"
+      pattern: "\\bEMP-[0-9]{6}\\b"
+      replacement: "[REDACTED-EMP-ID]"
+
+audit:
+  enabled: true
+  log_path: "stdout" # or "audit.log"
+  hash_inputs: true
+
+connectors:
+  - name: "enterprise-crm"
+    type: "openapi"
+    spec_file: "./examples/crm-openapi.yaml"
+    base_url: "http://localhost:8081"
+    headers:
+      Authorization: "Bearer internal-service-secret-token"
+      X-Gateway-Origin: "enterprise-mcp-gateway"
+    timeout_seconds: 15

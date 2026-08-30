@@ -1,0 +1,17 @@
+# Binaries
+bin/
+*.exe
+*.exe~
+*.dll
+*.so
+*.dylib
+
+# Test artifacts
+*.test
+*.out
+audit.log
+
+# IDE & OS
+.idea/
+.vscode/
+.DS_Store
