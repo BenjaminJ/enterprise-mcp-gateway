@@ -1,8 +1,21 @@
 # Enterprise MCP Gateway
 
 <p align="center">
+  <img src="https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go" alt="Go Version" />
+  <img src="https://img.shields.io/badge/Protocol-MCP%202024--11--05-blueviolet?style=flat" alt="MCP Version" />
+  <img src="https://img.shields.io/badge/Security-RBAC%20%2B%20DLP-green?style=flat" alt="Security" />
+  <img src="https://img.shields.io/badge/License-MIT-yellow?style=flat" alt="License" />
+</p>
+
+<p align="center">
   <b>Production-grade, high-performance Model Context Protocol (MCP) Gateway in Go.</b><br>
-  <i>A secure, audited, and PII-sanitized bridge connecting AI agents (Claude Desktop, Cursor, Gemini CLI, LangGraph) to legacy enterprise backends (Java/Spring Boot, Go microservices, relational databases).</i>
+  <i>A secure, audited, and PII-sanitized bridge connecting AI agents (Claude Desktop, Cursor, Antigravity, LangGraph) to enterprise backends (OpenAPI, Java/Spring Boot, Go microservices, relational databases).</i>
+</p>
+
+<p align="center">
+  <img src="docs/assets/demo.gif" alt="Enterprise MCP Gateway Live Demo" width="100%" />
+  <br>
+  <em><b>Live Demo:</b> AI Agent querying CRM with in-flight PII & card redaction (left) while the Gateway streams structured JSON audit logs in real-time (right).</em>
 </p>
 
 ---
@@ -83,6 +96,31 @@ go build -o bin/mockserver ./cmd/mockserver
 #### Option B: HTTP Server-Sent Events (SSE) Mode
 ```bash
 ./bin/mcp-gateway --config ./examples/config.yaml --transport sse --port 8080
+```
+
+### 4. Stream Live Audit Logs in Real-Time (Terminal 3)
+
+Follow and format structured audit records as tools execute:
+
+**PowerShell (Windows):**
+```powershell
+Get-Content -Path .\audit.log -Wait -Tail 10 | ForEach-Object {
+    if ($_ -match '^\s*\{') {
+        $e = $_ | ConvertFrom-Json
+        $time = ([DateTime]$e.timestamp).ToLocalTime().ToString("HH:mm:ss")
+        $statusColor = if ($e.status -eq "SUCCESS") { "Green" } else { "Red" }
+        $redactColor = if ($e.pii_redacted_count -gt 0) { "Yellow" } else { "DarkGray" }
+        Write-Host "[$time] " -NoNewline -ForegroundColor DarkGray
+        Write-Host "[$($e.status)] " -NoNewline -ForegroundColor $statusColor
+        Write-Host "$($e.tool) " -NoNewline -ForegroundColor Cyan
+        Write-Host "(Role: $($e.role), Latency: $($e.duration_ms)ms, Redacted: $($e.pii_redacted_count))" -ForegroundColor $redactColor
+    }
+}
+```
+
+**Bash / Linux / macOS (`jq`):**
+```bash
+tail -f audit.log | jq -c '{time: .timestamp, status: .status, tool: .tool, role: .role, latency_ms: .duration_ms, redacted: .pii_redacted_count}'
 ```
 
 ---

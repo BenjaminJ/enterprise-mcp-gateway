@@ -49,13 +49,13 @@ sanitizer:
 
 audit:
   enabled: true
-  log_path: "stdout" # or "audit.log"
+  log_path: "C:/Users/BenjaminJanssens/git/enterprise-mcp-gateway/audit.log"
   hash_inputs: true
 
 connectors:
   - name: "enterprise-crm"
     type: "openapi"
-    spec_file: "./examples/crm-openapi.yaml"
+    spec_file: "C:/Users/BenjaminJanssens/git/enterprise-mcp-gateway/examples/crm-openapi.yaml"
     base_url: "http://localhost:8081"
     headers:
       Authorization: "Bearer internal-service-secret-token"
