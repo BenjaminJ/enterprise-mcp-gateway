@@ -11,13 +11,30 @@ paths:
   /v1/customers:
     get:
       operationId: listCustomers
-      summary: List enterprise customer profiles
+      summary: List and search enterprise customer profiles
       description: |
-        Retrieves a paginated list of enterprise customer accounts. Use this tool when you need to search, discover, or browse customer records. Returns an array of customer objects containing customerId, name, email, and account status.
+        Retrieves a paginated list of enterprise customer profiles.
+
+        [Usage Guidelines]
+        - When to use: Use this tool to discover, search, or browse customer records across the organization, or to find a customerId before calling detail tools.
+        - When NOT to use: Do NOT use this tool if you already have a specific customerId and need full profile or contact attributes; use 'getCustomerDetails' instead. Do NOT use to inspect customer billing or invoices; use 'getBillingHistory' instead.
+        - Alternatives: Use 'getCustomerDetails' for single-record deep inspection.
+
+        [Behavior]
+        - Operation: Read-only and idempotent. Safe to call multiple times with identical parameters without side effects.
+        - Authorization: Requires 'readonly_agent', 'support_agent', or 'admin' role.
+        - DLP / Sanitization: Customer email addresses and account statuses are returned. Any internal notes are scrubbed.
+
+        [Parameters & Interactions]
+        - 'status' (query, optional): Filter by lifecycle state ('active', 'inactive', 'suspended'). If omitted, customers in all lifecycle states are returned.
+        - 'limit' (query, optional): Integer between 1 and 100 specifying maximum records to return per page. Defaults to 20 if omitted.
+
+        [Returns]
+        - Returns a JSON array of customer summary objects, each containing: customerId (string, e.g. 'cust-001'), name (string), email (string), and status (string).
       parameters:
         - name: status
           in: query
-          description: Filter customers by account lifecycle status (e.g., 'active', 'inactive', or 'suspended'). Leave empty to retrieve all statuses.
+          description: Filter customers by account lifecycle status. Valid values are 'active' (in good standing), 'inactive' (dormant), or 'suspended' (past due or locked). Leave empty to retrieve accounts across all lifecycle states.
           required: false
           schema:
             type: string
@@ -25,7 +42,7 @@ paths:
             example: active
         - name: limit
           in: query
-          description: Maximum number of customer records to return in a single page (between 1 and 100). Defaults to 20.
+          description: Maximum number of customer records to return in a single page (integer between 1 and 100). Defaults to 20 when omitted. Use smaller limits (e.g. 5-10) for faster LLM processing context.
           required: false
           schema:
             type: integer
@@ -36,11 +53,31 @@ paths:
       responses:
         '200':
           description: Successfully retrieved list of customer profiles.
+
     post:
       operationId: createCustomer
-      summary: Register a new enterprise customer
+      summary: Register and onboard a new enterprise customer
       description: |
-        Creates a new enterprise customer profile with contact information and primary payment details. Use this tool when onboarding a new account. Sensitive fields like payment card numbers are automatically redacted by the gateway before responses return.
+        Creates a new enterprise customer profile with contact information and primary payment details.
+
+        [Usage Guidelines]
+        - When to use: Use this tool during new account onboarding when registering a first-time customer.
+        - When NOT to use: Do NOT use this tool to modify or update existing customer information. Do NOT call this tool without confirming the customer does not already exist via 'listCustomers'.
+        - Alternatives: Use 'listCustomers' to verify uniqueness before creation.
+
+        [Behavior]
+        - Operation: Mutating and non-idempotent. Each invocation creates a distinct new customer record in the database.
+        - Side effects: Persists account data and provisions customer billing account.
+        - Authorization: Requires 'support_agent' or 'admin' role.
+        - DLP / Sanitization: Credit card numbers supplied in 'creditCard' are validated against Luhn checksum and masked with [REDACTED] in all gateway audit logs and responses.
+
+        [Parameters & Requirements]
+        - 'name' (string, required): Full legal personal name or corporate entity name (minimum 2 characters).
+        - 'email' (string, required): Valid corporate email address (RFC 5322 format) used for billing and identity.
+        - 'creditCard' (string, optional): 16-digit primary payment card number with optional hyphens or spaces.
+
+        [Returns]
+        - Returns HTTP 201 Created with JSON object containing: customerId (newly assigned ID, e.g. 'cust-042'), name, email, and status ('active').
       requestBody:
         required: true
         description: Customer registration payload including contact and billing details.
@@ -54,16 +91,16 @@ paths:
               properties:
                 name:
                   type: string
-                  description: Full legal name or corporate entity name of the customer (e.g., 'Alice Smith').
+                  description: Full legal name or corporate entity name of the customer (e.g., 'Alice Smith'). Minimum 2 characters.
                   example: "Alice Smith"
                 email:
                   type: string
                   format: email
-                  description: Primary corporate email address for account billing and notifications.
+                  description: Primary corporate email address for account billing and notifications. Must follow valid email format.
                   example: "alice@enterprise.com"
                 creditCard:
                   type: string
-                  description: Primary payment credit card number (16 digits). This field is sanitized in-flight via DLP.
+                  description: Primary payment credit card number (15 or 16 digits). Automatically validated via Luhn checksum and masked in-flight via DLP.
                   example: "4111-2222-3333-4444"
       responses:
         '201':
@@ -72,14 +109,30 @@ paths:
   /v1/customers/{customerId}:
     get:
       operationId: getCustomerDetails
-      summary: Retrieve detailed customer record by ID
+      summary: Retrieve full profile record for a specific customer by ID
       description: |
-        Retrieves the complete customer account record including full name, corporate email, tax identifier, registered address, and active service tier. Use this tool after discovering a customerId to inspect account metadata.
+        Retrieves comprehensive account profile metadata for an individual enterprise customer.
+
+        [Usage Guidelines]
+        - When to use: Use this tool when you have an exact customerId and need full profile information such as registered tax ID, billing address, account tier, and primary contact details.
+        - When NOT to use: Do NOT use this tool to search or discover customers; use 'listCustomers' instead. Do NOT use to view invoices or payment methods; use 'getBillingHistory' instead.
+        - Prerequisites: Requires a valid 'customerId' (format 'cust-XXX') previously obtained via 'listCustomers'.
+
+        [Behavior]
+        - Operation: Read-only and idempotent. Calling this tool causes no mutations or side effects.
+        - Authorization: Requires 'readonly_agent', 'support_agent', or 'admin' role.
+        - DLP / Sanitization: Sensitive personal attributes (such as SSN or tax identifiers) are automatically masked by the gateway DLP engine before response delivery.
+
+        [Parameters]
+        - 'customerId' (path, required): Unique customer identifier string in 'cust-XXX' format (e.g. 'cust-001'). Must match an existing customer record.
+
+        [Returns]
+        - Returns HTTP 200 with full customer profile: customerId, name, email, taxId (redacted), address, serviceTier, and status. Returns HTTP 404 if the customerId does not exist.
       parameters:
         - name: customerId
           in: path
           required: true
-          description: Unique customer identifier in format 'cust-XXX' (e.g., 'cust-001', 'cust-002').
+          description: Unique customer identifier in format 'cust-XXX' (e.g., 'cust-001', 'cust-002'). Must correspond to an existing customer record discovered via listCustomers.
           schema:
             type: string
             example: "cust-001"
@@ -92,14 +145,30 @@ paths:
   /v1/billing/{customerId}:
     get:
       operationId: getBillingHistory
-      summary: Retrieve customer billing statements and payment methods
+      summary: Retrieve customer billing statements, balances, and payment methods
       description: |
-        Retrieves complete billing statements, current balance due, active payment methods on file, and historical invoice IDs for a specific customer. Payment cards in the response are automatically redacted with [REDACTED] by the DLP engine.
+        Retrieves complete billing statements, current account balance due, payment methods on file, and historical invoice IDs for a specific customer.
+
+        [Usage Guidelines]
+        - When to use: Use this tool to answer customer inquiries regarding outstanding balances, billing disputes, invoice history, or active payment methods.
+        - When NOT to use: Do NOT use this tool for customer account profile details; use 'getCustomerDetails' instead. Do NOT use to search for customer IDs; use 'listCustomers' first. Do NOT use to check customer support issues; use 'listSupportTickets' instead.
+        - Prerequisites: Requires a valid customerId (e.g., 'cust-001') previously discovered using 'listCustomers'.
+
+        [Behavior]
+        - Operation: Read-only and idempotent. No financial transactions, charges, or balance mutations are executed.
+        - Authorization: Requires 'readonly_agent', 'support_agent', or 'admin' role.
+        - DLP / Sanitization: All payment card numbers, bank account numbers, and CVVs in responses are automatically masked with [REDACTED] by the zero-allocation gateway sanitizer.
+
+        [Parameters]
+        - 'customerId' (path, required): Unique customer identifier string (e.g. 'cust-001'). Must correspond to an active or archived customer account.
+
+        [Returns]
+        - Returns HTTP 200 with JSON object containing: customerId, currency, balanceDue (decimal), paymentMethods (array of masked card tokens), and invoices (array of invoice objects with id, date, amount, status). Returns HTTP 404 if customerId is not found.
       parameters:
         - name: customerId
           in: path
           required: true
-          description: Unique customer identifier in format 'cust-XXX' (e.g., 'cust-001').
+          description: Unique customer identifier in format 'cust-XXX' (e.g., 'cust-001'). Prerequisite is a valid customerId discovered from listCustomers.
           schema:
             type: string
             example: "cust-001"
@@ -112,21 +181,39 @@ paths:
   /v1/support/tickets:
     get:
       operationId: listSupportTickets
-      summary: Query customer support tickets
+      summary: Query and filter customer support tickets across the organization
       description: |
-        Queries open and resolved support tickets across the organization. Can be filtered by customerId or ticket urgency priority. Use this tool to check active issues, SLA status, or service incidents.
+        Queries open, in-progress, and resolved support incident tickets across enterprise accounts.
+
+        [Usage Guidelines]
+        - When to use: Use this tool to check existing service tickets, verify SLA status, review customer incident history, or ensure an issue is not already logged before filing a new ticket.
+        - When NOT to use: Do NOT use this tool to open or submit a new ticket; use 'createSupportTicket' instead. Do NOT use to check billing issues; use 'getBillingHistory' instead.
+        - Recommended Flow: Call 'listSupportTickets' first to inspect existing tickets for a customer before creating a duplicate with 'createSupportTicket'.
+
+        [Behavior]
+        - Operation: Read-only and idempotent. Querying tickets produces zero side effects or ticket state modifications.
+        - Authorization: Requires 'readonly_agent', 'support_agent', or 'admin' role.
+        - DLP / Sanitization: Ticket descriptions containing secrets or credentials are redacted prior to LLM presentation.
+
+        [Parameters & Interactions]
+        - 'customerId' (query, optional): Restricts ticket query to a single customer ID (e.g., 'cust-001'). If omitted, tickets across all enterprise accounts are queried.
+        - 'priority' (query, optional): Filter by ticket urgency level ('low', 'normal', 'high', 'urgent').
+        - Parameter Interaction: If both 'customerId' and 'priority' are provided, tickets matching BOTH filters are returned (AND logic).
+
+        [Returns]
+        - Returns HTTP 200 with JSON array of ticket objects, each containing: ticketId (e.g. 'tick-101'), customerId, subject, description, priority, status ('open', 'in_progress', 'resolved'), and createdAt timestamp.
       parameters:
         - name: customerId
           in: query
           required: false
-          description: Optional filter to retrieve support tickets for a specific customer ID (e.g., 'cust-001').
+          description: Optional filter to retrieve support tickets specifically for a single customer ID (e.g., 'cust-001'). When omitted, tickets across all customer accounts are returned.
           schema:
             type: string
             example: "cust-001"
         - name: priority
           in: query
           required: false
-          description: Filter tickets by urgency level ('low', 'normal', 'high', 'urgent').
+          description: Filter tickets by urgency level ('low', 'normal', 'high', 'urgent'). When combined with customerId, returns only tickets matching both filters. Leave empty to retrieve tickets of all priority tiers.
           schema:
             type: string
             enum: [low, normal, high, urgent]
@@ -134,11 +221,31 @@ paths:
       responses:
         '200':
           description: List of support tickets matching search criteria.
+
     post:
       operationId: createSupportTicket
-      summary: Open a new customer support ticket
+      summary: Open and route a new customer support incident ticket
       description: |
-        Creates a new support incident or customer inquiry ticket in the CRM. Assigns a unique ticket ID and routes it to the support queue based on specified priority.
+        Creates a new support incident or customer inquiry ticket in the CRM queue.
+
+        [Usage Guidelines]
+        - When to use: Use this tool to escalate customer technical issues, report system bugs, or file service requests that require support team intervention.
+        - When NOT to use: Do NOT use this tool before checking if a similar ticket already exists; use 'listSupportTickets' first to prevent duplicate tickets. Do NOT use to reset passwords; use 'adminResetPassword' instead.
+        - Prerequisites: Requires a confirmed customerId obtained from 'listCustomers' or 'getCustomerDetails'.
+
+        [Behavior]
+        - Operation: Mutating and non-idempotent. Each invocation assigns a new unique ticket ID and dispatches notifications to support engineers.
+        - Side effects: Creates a persistent ticket record and routes to on-call queues.
+        - Authorization: Requires 'support_agent' or 'admin' role ('readonly_agent' tokens are rejected with 403).
+
+        [Parameters & Validation]
+        - 'customerId' (string, required): Customer identifier string (e.g. 'cust-001') the ticket is filed on behalf of.
+        - 'subject' (string, required): Concise summary line of the incident (10 to 120 characters).
+        - 'description' (string, required): Detailed problem statement, reproduction steps, or error messages.
+        - 'priority' (string, optional): Urgency level: 'low', 'normal', 'high', or 'urgent'. Defaults to 'normal' if omitted.
+
+        [Returns]
+        - Returns HTTP 201 Created with JSON object: ticketId (e.g. 'tick-902'), customerId, subject, priority, status ('open'), and createdAt timestamp.
       requestBody:
         required: true
         description: Support ticket details including customer identifier, subject line, and description.
@@ -153,21 +260,21 @@ paths:
               properties:
                 customerId:
                   type: string
-                  description: The customer ID associated with this support request (e.g., 'cust-001').
+                  description: Unique customer ID associated with this support request (e.g., 'cust-001'). Must be an existing account identifier.
                   example: "cust-001"
                 subject:
                   type: string
-                  description: Brief summary or title of the support issue (e.g., 'Database latency issue').
+                  description: Concise summary line or title describing the core problem (e.g., 'Database latency issue on invoice generation'). Between 10 and 120 characters.
                   example: "Database latency issue on invoice generation"
                 description:
                   type: string
-                  description: Detailed explanation of the customer issue, reproduction steps, or question.
+                  description: Full detailed explanation of the incident, steps to reproduce, user impact, or relevant error codes.
                   example: "Customer reported timeouts when generating PDF invoices for Q3."
                 priority:
                   type: string
                   enum: [low, normal, high, urgent]
                   default: normal
-                  description: Urgency priority level for the ticket routing.
+                  description: Urgency priority level for routing and SLA dispatch. Defaults to 'normal' when omitted. Use 'urgent' only for total outages.
                   example: "high"
       responses:
         '201':
@@ -176,12 +283,30 @@ paths:
   /v1/admin/reset-password:
     post:
       operationId: adminResetPassword
-      summary: Force reset portal credentials (Admin only)
+      summary: Force reset customer portal credentials (Admin only)
       description: |
-        Administrative tool to trigger a password reset and generate temporary credentials for an enterprise customer portal user. Requires 'admin' RBAC role privileges.
+        Administrative security tool to trigger a password reset and generate temporary credentials for an enterprise portal user.
+
+        [Usage Guidelines]
+        - When to use: Use only when an authorized user is locked out of their enterprise portal account or security policy requires credential rotation.
+        - When NOT to use: Do NOT use for standard support questions or billing inquiries; use 'createSupportTicket' instead.
+        - Restrictions: Restricted exclusively to high-privilege administrators.
+
+        [Behavior]
+        - Operation: Mutating and destructive credential modification. Invalidates existing user sessions and updates password hashes.
+        - Side effects: Immediately terminates active portal sessions for the user account.
+        - Authorization: Strictly requires 'admin' RBAC token role. All other roles ('support_agent', 'readonly_agent') are rejected with 403 Forbidden.
+        - DLP / Audit: Both the invocation and generated credentials trigger high-severity SHA-256 hashed audit log events.
+
+        [Parameters]
+        - 'username' (string, required): Corporate email or portal login handle of the user account to reset.
+        - 'tempPassword' (string, optional): Explicit temporary password meeting enterprise complexity rules. If omitted, a cryptographically random 16-character string is generated.
+
+        [Returns]
+        - Returns HTTP 200 with JSON object: status ('success'), username, and temporary password expiry timestamp.
       requestBody:
         required: true
-        description: User account to reset.
+        description: User account identity and optional password payload.
         content:
           application/json:
             schema:
@@ -191,11 +316,11 @@ paths:
               properties:
                 username:
                   type: string
-                  description: Corporate username or email of the account to reset.
+                  description: Corporate username or email handle of the enterprise customer portal user to reset.
                   example: "alice@enterprise.com"
                 tempPassword:
                   type: string
-                  description: Optional temporary password. If omitted, a secure random one is generated.
+                  description: Optional explicit temporary password. Must contain uppercase, lowercase, digit, and special characters. If omitted, a secure 16-character random token is generated automatically.
                   example: "TempSecret2026!"
       responses:
         '200':
