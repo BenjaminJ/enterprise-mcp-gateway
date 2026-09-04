@@ -81,7 +81,7 @@ Ensure you have Go 1.24+ installed:
 
 ```bash
 # Clone the repository
-git clone https://github.com/goschan/enterprise-mcp-gateway.git
+git clone https://github.com/BenjaminJ/enterprise-mcp-gateway.git
 cd enterprise-mcp-gateway
 
 # Build gateway and mock backend server
