@@ -1,0 +1,40 @@
+name: CI
+
+on:
+  push:
+    branches: [ master, main ]
+  pull_request:
+    branches: [ master, main ]
+  schedule:
+    # Run every Monday at 06:00 UTC to verify freshness and catch upstream breakages
+    - cron: '0 6 * * 1'
+  workflow_dispatch:
+
+jobs:
+  test:
+    name: Test & Build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version: '1.24'
+          check-latest: true
+          cache: true
+
+      - name: Verify Dependencies
+        run: go mod verify
+
+      - name: Run Tests
+        run: go test -v -race ./...
+
+      - name: Build Binaries
+        run: |
+          go build -v -o bin/mcp-gateway ./cmd/gateway
+          go build -v -o bin/mockserver ./cmd/mockserver
+
+      - name: Test Docker Build
+        run: docker build -t enterprise-mcp-gateway:latest .

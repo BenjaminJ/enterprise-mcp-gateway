@@ -1,6 +1,8 @@
 # Enterprise MCP Gateway
 
 <p align="center">
+  <a href="https://github.com/BenjaminJ/enterprise-mcp-gateway/actions/workflows/ci.yml"><img src="https://github.com/BenjaminJ/enterprise-mcp-gateway/actions/workflows/ci.yml/badge.svg" alt="CI Status" /></a>
+  <a href="https://github.com/BenjaminJ/enterprise-mcp-gateway/commits/master"><img src="https://img.shields.io/github/last-commit/BenjaminJ/enterprise-mcp-gateway?style=flat" alt="Last Commit" /></a>
   <img src="https://img.shields.io/badge/Go-1.24+-00ADD8?style=flat&logo=go" alt="Go Version" />
   <img src="https://img.shields.io/badge/Protocol-MCP%202024--11--05-blueviolet?style=flat" alt="MCP Version" />
   <a href="https://glama.ai/mcp/servers/BenjaminJ/enterprise-mcp-gateway"><img src="https://glama.ai/mcp/servers/BenjaminJ/enterprise-mcp-gateway/badges/score.svg" alt="Glama Score" /></a>
